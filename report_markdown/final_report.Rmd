@@ -249,7 +249,7 @@ q1_p2
 ```
 
 From the first plot, we can see that if we plot the views directly, we are unable to see the trend.
-Since each year has, a small portion of trending videos obtain many views, and those videos can be seen as a part of extreme outliers. 
+Since each year has a small portion of trending videos with a huge amount of views, and those videos can be seen as a part of extreme outliers. 
 To solve that, I applied log10 scaled the y axis and plotted plot 2.
 Here we can see that clearly trending videos are getting more views, and videos from 2022 have much higher median views and higher lower fence. 
 
@@ -465,7 +465,7 @@ geom_boxplot()+
   ggtitle("Normalized likes per category")
 ```
 
-For the third plot, I normalized like for each video per category. One thing that interested me is that the second plot and the third plot are almost the same! So I will analyze whether there is some linear relationship between likes and views.
+For the third plot, I normalized like counts for each video per category. One thing that interested me is that the second plot and the third plot are almost the same! So I will analyze whether there is some linear relationship between likes and views.
 
 **Linear regression between like and number of views**
 
