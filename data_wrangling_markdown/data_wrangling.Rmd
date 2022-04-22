@@ -1,0 +1,573 @@
+---
+title: "JSC370_Project_Youtube_data_analysis"
+author: "Hantang Li"
+date: "3/5/2022"
+output: html_document
+---
+
+```{r setup, message=FALSE, echo=FALSE, warning=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(data.table)
+library(leaflet)
+library(tidyverse)
+#library(plyr)
+library(dplyr)
+library(ggplot2)
+library(mgcv)
+library(kableExtra)
+library(httr)
+library(jsonlite)
+library("rjson")
+```
+
+
+
+```{r, message=FALSE, echo=FALSE, }
+# Use `spec()` to retrieve the full column specification for this data.
+# Use rm(list = ls()) to clean the env
+CA_2017 <- read_csv("./CAvideos2.csv", show_col_types = FALSE)
+CA_2022 <- read_csv("./CA_youtube_trending_data_2022.csv", show_col_types = FALSE)
+
+api_key = "Your API key here"
+```
+
+
+
+# Introduction
+
+YouTube, the world's third most popular online destination, has transformed from a video-sharing site into a job opportunity for content creators in both new and mainstream media. (cite: https://www.elon.edu/u/academics/communications/journal/wp-content/uploads/sites/153/2017/06/06_Margaret_Holland.pdf)
+Individuals who upload videos on Youtube, also known as YouTubers, could turn on monetization features. One of the major ways YouTubers earn money is through the number of ad views (https://support.google.com/youtube/answer/72857?hl=en). Since ad views depend on each video's views, we would like to analyze what factors could result in a high view and how people's preferences have changed in recent years.
+
+The data set we will be using is six months of daily trending videos in Canada from 2017 to 2018 and daily trending videos in Canada from 2020 to current. They can download from Kaggle from the following link.
+
+2022:https://www.kaggle.com/rsrishav/youtube-trending-video-dataset
+2017:https://www.kaggle.com/datasnaek/youtube-new
+
+Those datasets are created by authors using YouTube Data API v3 to record trending videos on a daily basis.
+The data annotation can be found here [video data annotation](https://developers.google.com/youtube/v3/docs/videos):
+
+Since creators for each dataset used slightly different naming conventions, I listed a detailed explanation for all the column names for each dataset.
+
+**CA\_2017**| 
+:-----:|:-----:
+video\_id|The ID that YouTube uses to uniquely identify the video.
+trending\_date|Date that the video is on trending
+title|The video's title.
+channel\_title|the channel name that the video was uploaded to
+category\_id|" Varies between regions. To retrieve the categories for a specific video
+publish\_time|Time that the video is published
+tags|The keyword tag suggested for the video.
+views|The number of times the video has been viewed.
+likes|The number of users who have indicated that they liked the video.
+dislikes|The number of users who have indicated that they disliked the video.
+comment\_count|The number of comments for the video.
+thumbnail\_link|A link to the thumbnail images associated with the video.
+comments\_disabled|Whether the author allowed people to leave a comment.
+ratings\_disabled|Whether the author publicly displays a number of likes or dislikes.
+video\_error\_or\_removed|Whether the video can be viewed on a browser at the time data is recorded.
+description|The video's description. The property value has a maximum length of 5000 bytes and may contain all valid UTF-8 characters except?<?and?>.
+
+
+**CA\_2022**| 
+:-----:|:-----:
+video\_id|The ID that YouTube uses to uniquely identify the video.
+trending\_date|Date that the video is on trending
+title|The video's title.
+channelTitle|The channel name that the video was uploaded to
+categoryId|" Varies between regions. To retrieve the categories for a specific video, find it in the downloaded JSON file CA_category_id.json.
+publishedAt|Time that the video is published
+tags|The keyword tag suggested for the video.
+view\_count|The number of times the video has been viewed.
+likes|The number of users who have indicated that they liked the video.
+dislikes|The number of users who have indicated that they disliked the video. (note this feature has been removed from Youtube, so it will be zero in this dataset.)
+comment\_count|The number of comments for the video.
+thumbnail\_link|A link to the thumbnail images associated with the video.
+comments\_disabled|Whether the author allowed people to leave a comment.
+ratings\_disabled|Whether the author publicly display number of likes or dislikes.
+channelId|The channel ID that the video was uploaded to
+description|The video's description. The property value has a maximum length of 5000 bytes and may contain all valid UTF-8 characters except?<?and?>.
+
+In addition, we will use YouTube Data API v3 (https://developers.google.com/youtube/v3/docs) to obtain more data for each video as the CA_2017, and CA2022 dataset does not contain data related to video duration, video dimension and whether the video has a caption.
+
+We will analyze how each factor presented in the dataset affects youtube views as well as the differences between Canada's 2017 trending video and a current trending video.
+
+The Github repository link is [JSC370_Project_Youtube_data_analysis](https://github.com/Hantang-Li/JSC370_Project_Youtube_data_analysis).
+
+# Methods
+
+## Download the data
+
+For six months daily trending videos in Canada from 2017 to 2018:
+
+Open [2017 YT trending](https://www.kaggle.com/datasnaek/youtube-new) inside the browser, and download CAvideos.csv.
+
+
+For daily trending videos in Canada from 2020 to current:
+
+Open [2020 YT trending](https://www.kaggle.com/rsrishav/youtube-trending-video-dataset) inside the browser, and download CA_youtube_trending_data.csv.
+
+## Check data issues and clean the data
+
+### Check data size
+
+```{r, message=FALSE, echo=FALSE, warning=FALSE, include=FALSE}
+# check data type typeof()
+# check dataset date, we will compare video at around same time 2017: 17-12-1 to 18-5-31
+min(CA_2017$trending_date)
+max(CA_2017$trending_date)
+
+min(CA_2022$trending_date)
+max(CA_2022$trending_date)
+```
+
+We want to analyze the trending videos at around a similar time interval since CA_2017 contains trending videos ranging from 2017-12-1 to 2018-5-31, and the 2022 trending video contains data from 2020-08-12 2022-03-07. We want to clip the 2022 trending video data to range from 2021-08-14 to 2022-03-14, which includes six months of data ranging from the end of a year to the beginning of a year. 
+
+So we will remove all the CA_2022 data with trending_date larger than 2021-08-01 and smaller than 2022-03-01
+
+```{r, message=FALSE, echo=FALSE, warning=FALSE, include=FALSE}
+# remove all the data with trending_date larger than 2022-02-28 and smaller than 2021-08-01
+aug_01 <- as.POSIXct("2021-08-01",tz=Sys.timezone())
+CA_2022 <- CA_2022 %>% filter(CA_2022$trending_date >= aug_01)
+
+mar_01 <- as.POSIXct("2022-03-01",tz=Sys.timezone())
+CA_2022 <- CA_2022 %>% filter(CA_2022$trending_date <= mar_01)
+```
+
+```{r, message=FALSE, echo=FALSE, warning=FALSE, include=FALSE}
+# check data type typeof()
+# check dataset date, we will compare video at around same time 2017: 17-12-1 to 18-5-31
+min_2017 <- min(CA_2017$trending_date)
+max_2017 <- max(CA_2017$trending_date)
+
+min_2017
+max_2017
+
+min(CA_2022$trending_date)
+max(CA_2022$trending_date)
+```
+
+After removal, we observe there are some missing data. To list all the days with missing trending data, for each data set CA_2017 and CA_2022, respectively, we created a vector of all the date ranges from the start to the end trending date and listed all the trending dates that are not recorded in the data. 
+
+```{r, message=FALSE, echo=FALSE, warning=FALSE, include=FALSE}
+# check date difference, we observe there are missing dates
+max_2017 - min_2017
+mar_01 - aug_01
+
+length(unique(CA_2017$trending_date))
+length(unique(CA_2022$trending_date))
+
+# to obtain which dates are missing
+date_range <- seq(as.Date(min_2017), as.Date(max_2017), by = 1) 
+date_range[!date_range %in% as.Date(unique(CA_2017$trending_date))]
+
+date_range <- seq(as.Date(aug_01), as.Date(mar_01), by = 1) 
+date_range[!date_range %in% as.Date(unique(CA_2022$trending_date))]
+```
+
+Since only eight days of data are missing from the CA_2017 dataset and three days of data are missing from the CA_2022 data set, we do not need to worry a lot about it as it does not affect a lot while analyzing for video views.
+
+### Check duplicate data
+
+Since one video could be trending on two different days, we need to check whether one same video occurred twice on the same day.
+The method we use is to construct two data frames, one lists all the video trending date and video id pairs, and another is the unique video trending date and video id pairs. We compare whether those two data frames contain the same data. 
+
+```{r, message=FALSE, echo=FALSE, warning=FALSE, include=FALSE}
+count_vid_by_day_2017 <- CA_2017 %>% group_by(trending_date) %>% count()
+count_unique_vid_by_day_2017 <- CA_2017 %>% group_by(trending_date) %>% select(video_id) %>% unique() %>% count()
+all(count_vid_by_day_2017 == count_unique_vid_by_day_2017)
+```
+
+```{r, message=FALSE, echo=FALSE, warning=FALSE, include=FALSE}
+count_vid_by_day_2022 <- CA_2022 %>% group_by(trending_date) %>% count()
+count_unique_vid_by_day_2022 <- CA_2022 %>% group_by(trending_date) %>% select(video_id) %>% unique() %>% count()
+all(count_vid_by_day_2022 == count_unique_vid_by_day_2022)
+```
+
+Here we observed that for both CA_2022 and CA_2017 dataset have no duplicate video data on same day.
+
+
+### Check missing value
+
+```{r, message=FALSE, echo=FALSE, warning=FALSE, include=FALSE}
+summary(CA_2017)
+summary(CA_2022)
+```
+
+We use the summary function on both datasets to observe any missing value.
+
+And we observed that there are no missing values on both datasets.
+
+### Check data type
+
+We observe CA_2017's trending_date is stored as characters. For example, 2017-11-14 is stored as character 17.14.11
+we will need to convert it to POSIXct DateTime format. 
+
+Since R is hard to perform string operations, it takes quite a time while applying as.POSIXct or as.Date on a data frame with huge amount of rows. We use python to solve this problem, the script is insert_words.py after processed time format using python script, we save the file as CAvideos2.csv and load it directly while running R script.
+
+### Check column name
+
+```{r, message=FALSE, echo=FALSE, warning=FALSE, include=FALSE}
+colnames(CA_2017)
+colnames(CA_2022)
+
+colnames(CA_2022)[3] = "publish_time"
+colnames(CA_2022)[4] = "channel_id"
+colnames(CA_2022)[5] = "channel_title"
+colnames(CA_2022)[6] = "category_id"
+colnames(CA_2022)[9] = "views"
+colnames(CA_2022)
+```
+
+We observe that CA_2022 and CA_2017 have following different column names.
+
+**CA\_2017**|**CA\_2022**
+:-----:|:-----:
+publish\_time|publishedAt
+channel\_title|channelTitle
+category\_id|categoryId
+views|view\_count
+
+Here we will rename the CA_2022 dataset so both datasets will have the same column names that represent the same data.
+
+```{r, message=FALSE, echo=FALSE, warning=FALSE, include=FALSE}
+#CA_2017[CA_2017$video_error_or_removed,]
+CA_2017 = CA_2017[!CA_2017$video_error_or_removed,]
+
+CA_2022 = CA_2022[ , !(names(CA_2022) %in% c("channel_id"))]
+CA_2017= CA_2017[ , !(names(CA_2017) %in% c("video_error_or_removed"))]
+```
+
+
+In addition, CA_2022 contains an additional channel_id for each video and does not include video_error_or_removed information. Since we will be focusing on analyzing information for each video instead of the channel that the video belongs to, we will remove the channel_id column from CA_2022. And for CA_2017, by observing videos with video_error_or_removed is TRUE, we can see that some videos' title is labelled as Deleted, or it has zero likes and dislikes. Since the amount of error or removed video in CA_2017 is 27, which is small compared to the whole dataset size 40881, we can safely remove those videos from the CA_2017 data set and then remove the video_error_or_removed column.
+
+## Obtain each video's detailed data through YouTube Data API v3
+
+For each video, to obtain video duration, video dimension, and whether the video has a caption, we need to use YouTube Data API v3.
+
+The API key is obtained through Google cloud. The method we will use is video:list[video list method](https://developers.google.com/youtube/v3/docs/videos/list). This method is able to return a maximum of 50 videos in one call, so we first obtain a unique vector of all video ids for both data sets and then split the vector into a list of chunks. Each chunk contains 50 video ids. Then, we loop over the list of chunks and call API on each chunk of video ids. Note that the chunk of ids needs to be formulated as a comma-separated string. At last, we convert the API's result to a data frame and save it as a file called All_ca_trend_vid_content.csv, so we can load the data frame directly for future usage.
+
+```{r, message=FALSE, echo=FALSE, warning=FALSE, include=FALSE}
+unique_ca_vid_id_2017 = unique(CA_2017$video_id)
+unique_ca_vid_id_2022 = unique(CA_2022$video_id)
+
+length(unique_ca_vid_id_2017)
+length(unique_ca_vid_id_2022)
+```
+
+
+```{r, message=FALSE, echo=FALSE, warning=FALSE, include=FALSE}
+df_vid_content = try(read.csv(file = './All_ca_trend_vid_content.csv'), silent = TRUE)
+if (class(df_vid_content) == "try-error"){
+  df_vid_content = NA
+  # Combine video id from both years
+  all_cs_vid_ids <- unique(c(unique_ca_vid_id_2017, unique_ca_vid_id_2022))
+  # test split to chunks
+  unique_ca_vid_id_50_chunks <- split(all_cs_vid_ids, ceiling(seq_along(all_cs_vid_ids)/50))
+  # then use for loop to retrive the data
+  for(chunk in unique_ca_vid_id_50_chunks){
+      chunk_comma_sep <- paste(unlist(chunk), collapse = ',')
+      
+      # test
+      #print("length(unlist(chunk))")
+      #print(length(unlist(chunk)))
+      
+      # Call API
+      chunk_video_content <- GET(
+        url   = "https://www.googleapis.com/youtube/v3/videos",
+        query = list(
+          id = chunk_comma_sep,
+          part = "contentDetails",
+          key = api_key
+        )
+      )
+      
+      # Convert data as data frame
+      chunk_video_content <- content(chunk_video_content, as="text")
+      chunk_video_content <- fromJSON(chunk_video_content)
+      list_video_content <- chunk_video_content$items
+      
+      chunk_vid_id <- list_video_content$id
+      chunk_vid_duration <- list_video_content$contentDetails$duration
+      chunk_vid_dimention <- list_video_content$contentDetails$dimension
+      chunk_vid_definition <- list_video_content$contentDetails$definition
+      chunk_vid_caption <- list_video_content$contentDetails$caption
+      chunk_vid_licensedContent <- list_video_content$contentDetails$licensedContent
+      chunk_vid_projection <- list_video_content$contentDetails$projection
+      
+      # test
+      #print("length(chunk_vid_id)")
+      #print(length(chunk_vid_id))
+      
+      df_50<- data.frame(chunk_vid_id, chunk_vid_duration, 
+                              chunk_vid_dimention, chunk_vid_definition, 
+                              chunk_vid_caption,chunk_vid_licensedContent,chunk_vid_projection)
+      
+      if (any(is.na(df_vid_content))){
+        df_vid_content = df_50
+      }else{
+        df_vid_content = rbind(df_vid_content, df_50)
+      }
+        
+  }
+}
+```
+
+
+```{r, message=FALSE, echo=FALSE, warning=FALSE, include=FALSE}
+24427 + 9138 - length(df_vid_content$chunk_vid_id)
+```
+
+
+One problem that occurred is that We were unable to get the video detail for some videos due to the video becoming unavailable on youtube. One example is the video with id CYl1YwAO-ew, [video_link](https://www.youtube.com/watch?v=CYl1YwAO-ew). By clicking the link and trying to watch the video on the browser, it will display that it is a "Private video." And for those kinds of videos, we cannot get detailed information through API. Since 5364 out of 33557 videos are currently unavailable, and most of those are from the CA_2017 dataset, we need to consider those missing values in the following analysis.
+
+
+```{r, message=FALSE, echo=FALSE, warning=FALSE, include=FALSE}
+# Save the video content data
+#write.csv(df_vid_content, "All_ca_trend_vid_content.csv")
+```
+
+```{r, message=FALSE, echo=FALSE, warning=FALSE, include=FALSE}
+summary(df_vid_content)
+```
+
+Another problem is the video duration is stored as characters in ISO 8601 duration, so we will use lubridate to parse it to seconds.
+
+```{r, message=FALSE, echo=FALSE, warning=FALSE, include=FALSE}
+df_vid_content["chunk_vid_duration"] <- lapply(df_vid_content["chunk_vid_duration"], lubridate::duration)
+df_vid_content["chunk_vid_duration"] <- lapply(df_vid_content["chunk_vid_duration"], as.numeric)
+```
+
+
+
+### Join each video's detailed data with CA_2017 and CA_2022 dataframes respectively
+
+We use merge to merge the CA_2017 and CA_2022 datasets with the data frame that downloaded using API which contains additional video information including video duration, video dimension and whether the video has a caption.
+
+```{r, message=FALSE, echo=FALSE, warning=FALSE, include=FALSE}
+CA_2017 = merge(x=CA_2017, y=df_vid_content, all.x = T, all.y=F, by.x="video_id", by.y="chunk_vid_id")
+CA_2022 = merge(x=CA_2022, y=df_vid_content, all.x = T, all.y=F, by.x="video_id", by.y="chunk_vid_id")
+```
+
+Since category_id only contains an id that points to a specific category, we will merge the dataset with the id dictionary for the Canada region and obtain category names that each video belongs to. The id dictionary are downloaded from the Kaggle link provided in the introduction. The file name is CA_category_id.json.
+
+```{r, message=FALSE, echo=FALSE, warning=FALSE, include=FALSE}
+result <- fromJSON(file = "CA_category_id.json")
+
+df_CA_category_id = NA
+for(item in result$items){
+  df_item = as.data.frame(item)
+  if (any(is.na(df_CA_category_id))){
+    df_CA_category_id = df_item
+  }else{
+    df_CA_category_id = rbind(df_CA_category_id, df_item)
+  }
+}
+
+# clean the json dictionary file
+df_CA_category_id= df_CA_category_id[ , (names(df_CA_category_id) %in% c("id", "snippet.title"))]
+colnames(df_CA_category_id)[2] = "category_name"
+```
+
+```{r, message=FALSE, echo=FALSE, warning=FALSE, include=FALSE}
+CA_2017 = merge(x=CA_2017, y=df_CA_category_id, all.x = T, all.y=F, by.x="category_id", by.y="id")
+CA_2022 = merge(x=CA_2022, y=df_CA_category_id, all.x = T, all.y=F, by.x="category_id", by.y="id")
+
+```
+
+```{r, message=FALSE, echo=FALSE, warning=FALSE, include=FALSE}
+# After merging
+#CA_2017[is.na(CA_2017$category_name),]
+CA_2017 = data.table(CA_2017)
+CA_2022 = data.table(CA_2022)
+CA_2017[, category_name  := fifelse(is.na(category_name), "29", category_name)]
+CA_2022[, category_name  := fifelse(is.na(category_name), "29", category_name)]
+```
+
+After merging, we observe that the category with id = 29 does not match any category name in the dictionary, after research (https://gist.github.com/dgp/1b24bf2961521bd75d6c) category ID 29 corresponds to category name Nonprofits & Activism, so we replace all the NA category names as Nonprofits & Activism. 
+
+Here we transfer CA_2017 and CA_2022 as data.table for convenience.
+
+```{r, message=FALSE, echo=FALSE, warning=FALSE, include=FALSE}
+CA_2017$year <- "2017"
+CA_2022$year <-"2022"
+df_CA_trending = rbind(CA_2017, CA_2022)
+```
+
+```{r, message=FALSE, echo=FALSE, warning=FALSE, include=FALSE}
+df_CA_trending$category_name <- replace(df_CA_trending$category_name, df_CA_trending$category_name=="29", "Nonprofits & Activism")
+```
+
+
+```{r}
+# Save as RDA file for final report
+save(df_CA_trending, file='df_CA_trending.Rda')
+```
+
+
+For the last step, we add an indication column to CA_2017 and CA_2022 to indicate which dataset the video is from and then concatenate two datasets into one data set called df_CA_trending.
+
+
+
+## EDA
+
+```{r, message=FALSE, echo=FALSE, warning=FALSE, include=FALSE}
+colnames(df_CA_trending)
+```
+
+Since we are mostly interested in the number of views for data exploration:
+
+1. As more younger generations are accessing Youtube, we will use a box plot to compare the number of views between the years 2017 and 2022 for all trending videos to observe whether there is an increasing trend.
+2. As the short video has arisen since 2016, we will use a histogram to compare the video length between the years 2017 and 2022 for all trending videos to observe whether there is a decreasing trend.
+3. We are curious about what factors could affect the number of views, the number of likes and number of comments will have a positive linear relationship with the number of views, so we can fit a linear regression between a number of likes and the number of views as well as the number of comments and number of views. But we are not sure whether the video's length has an effect on the number of views to explore the relationship between the video length and the number of views we will use advanced linear regression with a cubic regression spline on video's length.
+4. We are also curious about whether the trending video category has changed from 2017 to 2022. We will use a bar plot to plot the number of trending videos belonging to each category for 2017 and 2022, respectively.
+
+# Results
+
+## Box plot to compare the number of views between year 2017 and 2022 for all trending videos
+
+```{r, message=FALSE, echo=FALSE, warning=FALSE}
+views_summary_2017 <- data.table(as.array(summary(CA_2017$views)))
+colnames(views_summary_2017)[1] = "statistics"
+colnames(views_summary_2017)[2] = "value"
+views_summary_2022 <- data.table(as.array(summary(CA_2022$views)))
+colnames(views_summary_2022)[1] = "statistics"
+colnames(views_summary_2022)[2] = "value"
+knitr::kable(views_summary_2017, caption = "2017 views statistics")
+knitr::kable(views_summary_2022, caption = "2022 views statistics")
+```
+
+We observe that there is an increasing trend of the number of views, since the mean number of views in 2017 is 1146867s but in 2022 is 2022494s.
+
+```{r, message=FALSE, echo=FALSE, warning=FALSE}
+ggplot(df_CA_trending, aes(x=year, y=views)) + 
+  geom_boxplot()+ggtitle("Box plot comparing video views by year using original data")
+```
+
+By plotting the original data, we observe many outliers that affect what the boxplot shows. 
+
+```{r, message=FALSE, echo=FALSE, warning=FALSE}
+ggplot(df_CA_trending, aes(x=year, y=views)) + 
+  geom_boxplot(outlier.shape = NA) +
+  scale_y_continuous(limits = quantile(df_CA_trending$views, c(0.1, 0.9)))+ggtitle("Box plot comparing trending video views by year using data without outlier")
+```
+
+After removing outliers, the increasing trend is significant. And we can see there are more viewers per Canadian trending video in 2022 compared to 2017.
+
+
+## Histogram to compare the video duration between year 2017 and 2022
+
+```{r, message=FALSE, echo=FALSE, warning=FALSE}
+len_summary_2017 <- data.table(as.array(summary(CA_2017$chunk_vid_duration)))
+colnames(len_summary_2017)[1] = "statistics"
+colnames(len_summary_2017)[2] = "value"
+len_summary_2022 <- data.table(as.array(summary(CA_2022$chunk_vid_duration)))
+colnames(len_summary_2022)[1] = "statistics"
+colnames(len_summary_2022)[2] = "value"
+knitr::kable(len_summary_2017, caption = "2017 video duration statistics")
+knitr::kable(len_summary_2022, caption = "2022 video duration statistics")
+```
+
+By observing the summary table, over 75 percent of the video are under 1000 seconds for both years and we can estimate that most of the trending video for both years is under 1200 seconds. So, to show a distribution of most of the videos, we remove videos with a duration larger than 20 min.
+
+```{r, message=FALSE, echo=FALSE, warning=FALSE}
+df_vid_dur_less_1200 <- df_CA_trending %>%
+  filter(!(chunk_vid_duration %in% NA)) %>%
+  filter(!(chunk_vid_duration > 1200))
+
+df_vid_dur_less_1200_2022 <- df_vid_dur_less_1200[df_vid_dur_less_1200$year == "2022",]
+df_vid_dur_less_1200_2017 <- df_vid_dur_less_1200[df_vid_dur_less_1200$year == "2017",]
+df_vid_dur_less_1200_2022<- df_vid_dur_less_1200_2022[sample(nrow(df_vid_dur_less_1200_2022), 10000), ]
+df_vid_dur_less_1200_2017<- df_vid_dur_less_1200_2017[sample(nrow(df_vid_dur_less_1200_2017), 10000), ]
+
+df_vid_dur_less_1200<- rbind(df_vid_dur_less_1200_2017, df_vid_dur_less_1200_2022)
+df_vid_dur_less_1200 %>%
+  ggplot(aes(x=chunk_vid_duration, color=year), na.rm=TRUE) +
+  geom_histogram(fill="white", alpha=0.5, position="dodge")+ xlab("vid_duration") +ggtitle("Histogram of video duration distribution for 2017 and 2022 trending videos")
+```
+
+Since there are fewer videos in 2017 that have video duration recorded, we uniformly sample 10000 videos from the year 2017 and year 2022 to visualize the distribution of video duration. And then plot the histogram using the sampled data. 
+
+We applied position="dodge" to avoid overlapping and show count more clearly. 
+
+From the plot, we observe that most of the trending videos that are under 1200 seconds from 2022 are distributed around 50 seconds, and there is a small mode around 200 and 500 seconds, respectively. While most of the trending videos from 2017 are distributed around two modes, one is around 200 seconds, and another is around 600 seconds. 
+
+So, in conclusion, people prefer shorter videos that are less than one minute nowadays, and people are also willing to watch videos that are around 3 min or larger than 10 minutes. While back in 2017, video with 3 min length seems to be a major choice. So one suggestion for current YouTubers is to produce videos that are less than 1 minute or produce long videos that are around 10 minutes or more.
+
+
+
+## Explore factors that may affect number of views.
+
+### Linear regression between like, comment and number of views
+
+```{r, message=FALSE, echo=FALSE, warning=FALSE}
+lm_model <- lm(views~likes, data = df_CA_trending, na.action=na.omit)
+#summary(lm_model)
+ggplot(df_CA_trending, aes(x=likes, y=views), na.rm=TRUE) + 
+  geom_point() +
+  geom_smooth(method = lm)
+```
+
+Here we observed a significant positive linear relationship between likes and view, as the p_value for coefficients is less than 0.05. Further, the r-squared is 0.7, which is close to one, and it shows we can even estimate the number of views based on the number of likes using the linear regression model.
+
+```{r, message=FALSE, echo=FALSE, warning=FALSE}
+df_comment_larger_0 <- df_CA_trending %>%
+  filter(!(comment_count %in% NA)) %>%
+  filter(!(comments_disabled))
+
+lm_model <- lm(views~comment_count, data = df_comment_larger_0, na.action=na.omit)
+#summary(lm_model)
+ggplot(df_comment_larger_0, aes(x=comment_count, y=views), na.rm=TRUE) + 
+  geom_point() +
+  geom_smooth(method = lm)
+```
+
+Since many videos disable viewers from leaving a comment, we remove videos with a disable comment setting and then create a linear regression model between comment_count and views.
+Here we observed a significant positive linear relationship between comment count and view, as the p_value for coefficients is less than 0.05.
+
+### Advanced regression, estimate views using cubic regression spline on video duration
+
+
+```{r, message=FALSE, echo=FALSE, warning=FALSE}
+df_vid_dur_less_1200 <- df_CA_trending %>%
+  filter(!(chunk_vid_duration %in% NA)) %>%
+  filter(!(chunk_vid_duration > 1200))
+
+gam_mod <- gam(views~ s(chunk_vid_duration, bs = "cr"), data = df_vid_dur_less_1200, na.action=na.omit)
+#summary(gam_mod)
+plot(gam_mod, xlab="vid_duration", ylab="c(vid_duration)")
+ggplot(df_vid_dur_less_1200, aes(x=chunk_vid_duration, y=views), na.rm=TRUE) + 
+  geom_point() +
+  geom_smooth(method = "gam",  col=2)+ xlab("vid_duration")
+```
+
+As the p_value for both intercept and significance of smooth terms is less than 0.05, we are confident that the trend shown in the graph could estimate the relationship between video duration and the number of views. We observe that there is a mode of the number of views when the video duration is around 0, 210, 550, 900. And there is a negative relationship between video duration and the number of views. 
+
+## Which cateory is most popular for 2017 and 2022 respectively, using bar plot
+
+```{r, message=FALSE, echo=FALSE, warning=FALSE}
+df_category_count <- df_CA_trending %>% 
+  group_by(category_name, year) %>% 
+  count()
+
+df_category_count_2017 <- df_category_count[df_category_count$year=="2017",]
+df_category_count_2022 <- df_category_count[df_category_count$year=="2022",]
+
+
+ggplot(data=df_category_count_2017, aes(x=reorder(category_name, -n), y=n)) +
+geom_bar(stat="identity", position=position_dodge())+ theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))+ xlab("Category name")+ggtitle("2017 num of trending videos per category")
+ggplot(data=df_category_count_2022, aes(x=reorder(category_name, -n), y=n)) +
+geom_bar(stat="identity", position=position_dodge())+ theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))+ xlab("Category name")+ggtitle("2022 num of trending videos per category")
+```
+
+By observing the bar plot, in 2017, most trending videos are labelled as entertainment videos, then News and Politics and people and blogs. However, in 2022 most trending videos are labelled as gaming and entertainment. The number of trending News and Politics videos has decreased from 2017 to 2022.
+
+
+## Summary
+
+In conclusion, there is an increasing trend on average and the medium number of views per video, which shows that more people in Canada have been using Youtube since 2017. YouTubers might gradually earn more money each year in general. And there is a decreasing trend in video length, which shows people prefer short videos nowadays. That probably also related to the arising of short video companies like Tictoc. Further, usual videos with high views are likely getting more likes and comments, and the number of views depends on video duration. Short videos tend to get more views. At last, more trending videos in Canada are Gaming videos and fewer News and Politics videos are trending. One possible guess is that more younger generations are getting access to Youtube, and older generations have started not to use Youtube. For future analysis, we will make use of the video tags, video title and description variables that we haven't used in this analysis. We will use techniques such as natural language processing to explore further those variables' relationship with video views for all Canadian youtube trending videos.
+
+
+
+## Github repository link
+
+[JSC370_Project_Youtube_data_analysis](https://github.com/Hantang-Li/JSC370_Project_Youtube_data_analysis)

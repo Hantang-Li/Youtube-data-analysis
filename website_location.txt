@@ -1,0 +1,4 @@
+git repo:https://github.com/Hantang-Li/JSC370-Final
+web: https://hantang-li.github.io/JSC370-Final/
+
+I have linked my presentation video in the website.
