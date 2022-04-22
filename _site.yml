@@ -1,0 +1,13 @@
+name: "JSC370 Final website"
+output_dir: "./docs"
+navbar:
+  title: "JSC370 Final Project"
+  left:
+    - text: "Home"
+      href: index.html
+output:
+  html_document:
+    theme: cosmo
+    include:
+      after_body: footer.html
+    css: styles.css

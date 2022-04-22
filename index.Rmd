@@ -1,0 +1,270 @@
+---
+title: "JSC370 Final Youtube Data Interactive visualization"
+author: "Hantang Li"
+date: "4/21/2022"
+output: 
+    html_document
+---
+
+
+
+```{r setup, message=FALSE, echo=FALSE, warning=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(data.table)
+library(leaflet)
+library(tidyverse)
+#library(plyr)
+library(dplyr)
+library(ggplot2)
+library(mgcv)
+library(kableExtra)
+library(httr)
+library(jsonlite)
+library("rjson")
+library(plotly)
+```
+
+```{r, message=FALSE, echo=FALSE, warning=FALSE}
+load("df_CA_trending.Rda")
+#summary(df_CA_trending)
+df_CA_trending <- df_CA_trending[likes!=0 | views!=0 | comment_count!=0]
+df_CA_trending <- df_CA_trending[chunk_vid_duration != 0]
+
+extreme_variables <- select(df_CA_trending,trending_date, views, likes, chunk_vid_duration)
+
+extreme_variables <- data.table(as.array(summary(extreme_variables)))
+#colnames(extreme_variables)[1] = "category_id"
+#colnames(extreme_variables)[2] = "video_id"
+#knitr::kable(extreme_variables, caption = "Extreme variables")
+```
+
+
+This is my JSC370 Final website.
+
+# Introduction
+
+YouTube, the world's third most popular online destination, has transformed from a video-sharing site into a job opportunity for content creators in both new and mainstream media. 
+Individuals who upload videos on Youtube, also known as YouTubers, could turn on monetization features. One of the major ways YouTubers earn money is through the number of ad views. 
+
+**Since ad views directly depend on each video's views, we would like to analyze whether YouTube is still popular, what factors could result in a high view and how people's preferences have changed from 2017 to 2022.**
+
+This website will show you five interactive visualization plots to help answer this question.
+
+We will use past Canadian area's youtube daily trending video datasets found online to answer this question. The largest past youtube trending video data set we found online is from Kaggle. The dataset contains detailed daily trending video information collected using YouTube Data API v3 ranging from 2017-12-01 to 2018-05-31. The download link is https://www.kaggle.com/rsrishav/youtube-trending-video-dataset. **We will denote data from this dataset as 2017 video data in the following plots**
+
+For comparison, we found another Canadian area's youtube daily trending video dataset from Kaggle with a similar data format which was collected using YouTube Data API v3. The data ranges from 2020-08-12 to 2022-03-07. The download link is https://www.kaggle.com/rsrishav/youtube-trending-video-dataset.  **We will denote data from this dataset as 2022 video data in the following plots**
+
+I have cleaned both data and joined them in to one dataset. For detailed data wrangling procedure, please see the report link below.
+
+# Report Link
+
+Which includes detailed explanation with additional plots to answer the following questions.
+
+(link: [My Report](https://github.com/Hantang-Li/JSC370-Final/blob/main/final_report.pdf))
+
+# Presentation Link
+
+I will present about how to use each interactive plot to derive the questions' result.
+
+(link: [My Presentation](https://github.com/Hantang-Li/JSC370-Final/blob/main/presentation.mkv))
+
+# Interactive plots
+
+
+## 1. Does more people are using youtube?
+
+```{r, message=FALSE, echo=FALSE, warning=FALSE}
+# q1_p1 <- ggplot(data=df_CA_trending, aes(x=year, y=views, colour=year)) +
+#   geom_boxplot(outlier.shape = NA) +
+#   scale_y_continuous(limits = quantile(df_CA_trending$views, c(0, 0.9)))+
+#   scale_y_log10()+
+#   ylab("Views")+
+#   xlab("Year")+
+#   ggtitle("Box plot comparing trending video views by year")
+
+q1_p1 <- ggplot(data=df_CA_trending, aes(x=year, y=views, colour=year)) +
+  geom_boxplot(outlier.shape = NA) +
+  ylab("Views")+
+  xlab("Year")+
+  ggtitle("Box plot comparing trending video views by year")
+
+q1_p2 <- ggplot(data=df_CA_trending, aes(x=year, y=views, colour=year)) +
+  geom_boxplot(outlier.shape = NA) +
+  scale_y_log10()+
+  ylab("Views")+
+  xlab("Year")+
+  ggtitle("Box plot comparing log scaled trending video views by year")
+
+```
+
+### Box plot comparing trending video views by log scaled year
+
+
+```{r, message=FALSE, echo=FALSE, warning=FALSE}
+ggplotly(q1_p2)
+```
+
+This plot shows the distribution of log scaled views per trending video. The y axis is the log 10 of the original views. Due to some videos having very large views, the box plot without scaling will be in bad shape, so we applied to lig scale to views, and the purpose is for users to see the distribution clearly. You can hover your mouse around the box plot to see each component of the boxplot in detail.
+
+
+
+```{r, message=FALSE, echo=FALSE, warning=FALSE}
+
+df_CA_trending_normalized_view <- copy(df_CA_trending)
+
+
+df_CA_trending_normalized_view[year==2017, ]$views <- df_CA_trending_normalized_view[year==2017, ]$views / sum(df_CA_trending_normalized_view[year==2017, ]$views)
+df_CA_trending_normalized_view[year==2022, ]$views <- df_CA_trending_normalized_view[year==2022, ]$views / sum(df_CA_trending_normalized_view[year==2022, ]$views)
+
+df_vid_duration_avg <- df_CA_trending_normalized_view %>%
+  filter(likes > 0) %>% 
+  filter(views > 0) %>% 
+  filter(chunk_vid_duration > 0) %>% 
+  group_by(category_name, year) %>% 
+  summarise(across(c(chunk_vid_duration, views, likes), mean, na.rm = TRUE))
+
+df_vid_duration_count <- df_CA_trending_normalized_view %>%
+  group_by(category_name, year) %>% 
+  count()
+
+df_vid_count_duration_avg <- merge(df_vid_duration_avg, df_vid_duration_count)
+
+df_vid_count_duration_avg$category_name <- replace(df_vid_count_duration_avg$category_name, df_vid_count_duration_avg$category_name=="29", "Nonprofits & Activism")
+
+# Normalize count
+num_videos_2017 <- count(df_CA_trending_normalized_view[df_CA_trending_normalized_view$year=="2017",])
+num_videos_2022 <- count(df_CA_trending_normalized_view[df_CA_trending_normalized_view$year=="2022",])
+
+df_vid_count_duration_avg_2017 <- df_vid_count_duration_avg[df_vid_count_duration_avg$year=="2017",]
+df_vid_count_duration_avg_2022 <- df_vid_count_duration_avg[df_vid_count_duration_avg$year=="2022",]
+
+df_vid_count_duration_avg_2017$norm_n <- df_vid_count_duration_avg_2017$n / num_videos_2017$n
+df_vid_count_duration_avg_2022$norm_n <- df_vid_count_duration_avg_2022$n / num_videos_2022$n
+
+df_vid_count_duration_avg <- rbind(df_vid_count_duration_avg_2017, df_vid_count_duration_avg_2022)
+
+# Plot
+
+p1_scatter <- df_vid_count_duration_avg %>% 
+  plot_ly(x = ~year, y = ~views,
+          type = 'scatter', mode = 'markers', color = ~category_name,
+          size = ~norm_n, sizes = c(5, 70), marker = list(sizemode='diameter', opacity=0.5),
+          hoverinfo = 'text',
+          text = ~paste( paste("Category ", category_name, ":", sep=""), paste("Average duration: ", round(chunk_vid_duration, digits = 3), " Seconds", sep="") , 
+                         paste("Average normalized views: ", round(views, digits = 9), sep=""), paste("Average likes: ", round(likes, digits = 3), sep=""), paste("Count: ", n, sep=""),
+                         paste(year, "Video Percentage: ", round(norm_n, digits = 3), sep=""), sep = "<br>")) %>%
+  layout(title = "2017 and 2022 Youtube trending video Average Views vs Percentage per category",
+                  yaxis = list(title = "Average normalized views"), xaxis = list(title = "Year"),
+         hovermode = "compare")
+
+
+
+
+p2_scatter <- df_vid_count_duration_avg %>% 
+  plot_ly(x = ~chunk_vid_duration, y = ~views,
+          type = 'scatter', mode = 'markers', color = ~category_name,
+          size = ~norm_n, sizes = c(5, 70), marker = list(sizemode='diameter', opacity=0.5),
+          symbol = ~year,
+          hoverinfo = 'text',
+          text = ~paste( paste("Category ", category_name, ":", sep=""), paste("Average duration: ", round(chunk_vid_duration, digits = 3), " Seconds", sep="") , 
+                         paste("Average normalized views: ", round(views, digits = 9), sep=""), paste("Average likes: ", round(likes, digits = 3), sep=""), paste("Count: ", n, sep=""),
+                         paste(year, "Video Percentage: ", round(norm_n, digits = 3), sep=""), sep = "<br>")) %>%
+  layout(title = "Youtube trending video Average normalized views vs Average duration",
+                  yaxis = list(title = "Average normalized views"), xaxis = list(title = "Average duration"),
+         hovermode = "compare")
+```
+
+## 2. Which category is most popular?
+
+### 2017 and 2022 Youtube trending video Average Views vs Percentage per category
+
+```{r, message=FALSE, echo=FALSE, warning=FALSE,out.width = "80%"}
+p1_scatter
+```
+
+This plot shows average normalized views and their corresponding category for each year. Each colour represents a different category. The size of each ball shows what percentage of each categories' video accounted for the total number of videos in a year. You can hover your mouse around each ball to see detailed information or double-click the category list on the right side to see each category's data in detail.
+
+### 2017 and 2022 Youtube trending video Average views vs Average duration
+
+```{r, message=FALSE, echo=FALSE, warning=FALSE,out.width = "80%"}
+p2_scatter
+```
+
+This plot shows the relation between video duration and their views. And how those two are associated with each category. Each colour represents a different category. The size of each ball shows what percentage of each categories' video accounted for the total number of videos in a year. Triangles represent the data associated with videos from 2022, and circles represent the data related to videos from 2017. You can hover your mouse around each ball or triangle to see detailed information or double-click the category list on the right side to see each category's data in detail.
+
+
+## 3. What words do those popular videos use on their title?
+
+```{r, message=FALSE, echo=FALSE, warning=FALSE}
+CA_2022<-df_CA_trending[year==2022,]
+CA_2017<-df_CA_trending[year==2017,]
+```
+
+```{r, message=FALSE, echo=FALSE, warning=FALSE}
+library(wordcloud)
+library(tidytext)
+```
+
+
+```{r, message=FALSE, echo=FALSE, warning=FALSE, out.width = "80%"}
+tokens_2017 <- CA_2017 %>% 
+  select(title) %>% 
+  unique() %>% 
+  unnest_tokens(word, title) %>% 
+  anti_join(stop_words, by="word") %>% 
+  subset(!grepl("^\\d+$", word)) %>% 
+  group_by(word) %>% 
+  summarise(word_frequency=n()) %>% 
+  arrange(across(word_frequency, desc)) %>% 
+  head(20)
+
+```
+
+```{r, message=FALSE, echo=FALSE, warning=FALSE, out.width = "80%"}
+tokens_2022 <- CA_2022 %>% 
+  select(title) %>% 
+  unique() %>% 
+  unnest_tokens(word, title) %>% 
+  anti_join(stop_words, by="word") %>% 
+  subset(!grepl("^\\d+$", word)) %>% 
+  group_by(word) %>% 
+  summarise(word_frequency=n()) %>% 
+  arrange(across(word_frequency, desc)) %>% 
+  head(20)
+```
+
+### Word frequency for 2017 and 2022 YouTube trending video titles
+
+```{r, message=FALSE, echo=FALSE, warning=FALSE,out.width = "80%"}
+
+tokens_2017$year <- "2017"
+tokens_2022$year <-"2022"
+tokens = rbind(tokens_2017, tokens_2022)
+
+plot_tk<-tokens %>% 
+  ggplot(aes(reorder(word, word_frequency), word_frequency,colour=year)) + geom_bar(stat="identity") + coord_flip()+
+  ggtitle("Word frequency for 2017 and 2022 YouTube trending video titles")
+ggplotly(plot_tk)
+```
+
+This plot used the Text Mining method to extract word frequency and removed stop words, it shows what are the most popular 20 words that appeared in the video title for both 2017 and 2022 video data. You can hover your mouse to check each word in detail.
+
+### 4. What time to publish those videos could obtain most views?
+
+```{r, message=FALSE, echo=FALSE, warning=FALSE, warning=FALSE,out.width = "80%"}
+df_CA_trending_publish_time<- copy(df_CA_trending)
+
+df_CA_trending_publish_time$publish_time <- format(df_CA_trending_publish_time$publish_time, format = "%H")
+
+plot_4 <- ggplot(df_CA_trending_publish_time, aes(publish_time, views)) +
+  scale_y_log10()+
+  geom_hline(yintercept = median(df_CA_trending_publish_time$views), color="blue")+
+  geom_boxplot(na.rm=TRUE)+ 
+  ggtitle("Scaled median views per each hour")
+
+ggplotly(plot_4)
+```
+
+This plot shows how each trending video's publishing time and the number of views are related. So users could select the best time to upload their video in order to get a better view.
+
+

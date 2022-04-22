@@ -1,20 +1,25 @@
 # JSC370_Project_Youtube_data_analysis
 
+author: Hantang Li
+
 YouTube, the world’s third most popular online destination, has transformed from a video-sharing site into a job opportunity for content creators in both new and mainstream media. (cite: https://www.elon.edu/u/academics/communications/journal/wp-content/uploads/sites/153/2017/06/06_Margaret_Holland.pdf) Individuals who upload videos on Youtube, also known as YouTubers, could turn on monetization features. One of the major ways YouTubers earn money is through the number of ad views (https://support.google.com/youtube/answer/72857?hl=en). Since ad views depend on each video’s views, we would like to analyze what factors could result in a high view and how people’s preferences have changed in recent years.
 
-## Instruction For Produce the website
+We will use past Canadian area's youtube daily trending video datasets found online to answer this question. The largest past youtube trending video data set we found online is from Kaggle. The dataset contains detailed daily trending video information collected using YouTube Data API v3 ranging from 2017-12-01 to 2018-05-31. The download link is https://www.kaggle.com/rsrishav/youtube-trending-video-dataset. 
 
-## Instruction For Produce the final report
+For comparison, we found another Canadian area's youtube daily trending video dataset from Kaggle with a similar data format which was collected using YouTube Data API v3. The data ranges from 2020-08-12 to 2022-03-07. The download link is https://www.kaggle.com/rsrishav/youtube-trending-video-dataset. 
 
-We have included the preprocessed data 'df_CA_trending.Rda' inside the repository, so you can directly reproduce the final report by opening '__.rmd' and knit.
-But if you would like to run the data preprocessing procedure you can follow the section "Instruction For Data Wrangling"
+**Link to this repository:** https://github.com/Hantang-Li/JSC370-Final
 
-## Instruction For Data Wrangling and produce df_CA_trending.Rda
+**Link to the website:** https://hantang-li.github.io/JSC370-Final/
 
-1. Download CA_youtube_trending_data.csv from https://www.kaggle.com/rsrishav/youtube-trending-video-dataset and place to the data_wrangling folder.
-2. Download CAvideos.csv from https://www.kaggle.com/datasnaek/youtube-new?select=CAvideos.csv and place to the data_wrangling folder.
-3. Download CA_category_id.json from https://www.kaggle.com/datasnaek/youtube-new (I have included in the data_wrangling folder)
-4. Run ./data_wrangling/insert_words.py and it will produce CAvideos2.csv
-5. The necessarry files Run ./data_wrangling/data_wrangling.Rmd inside R studio to produce the same result (an html file).
+# Project components
 
-Note that I also included my API call result All_ca_trend_vid_content.csv, so you do not have to obtain a key and run the API for a long time to obtain the additional data. 
+This project includes two reproducible reports and one script for data preprocessing. 
+
+* 1. The website: The website's knitted HTML files are included in the docs folder. You can reproduce it by following the procedures in the data folder's readme file. The website provides a link to the final report and a presentation that introduces the website. 
+* 2. The final report: The knitted PDF report is final_report.pdf. You can reproduce it by following the procedures in the data folder's readme file. The final report provides detailed preprocessing procedures and analysis of the youtube trending data.
+* 3. (Extra) The preprocessing script, records all the preprocessing code that can be used to produce preprocessed data set for producing the final report and website.
+
+# Data set
+
+You can find preprocessed dataset df_CA_trending.Rda from the data folder, with instruction on how to use it.

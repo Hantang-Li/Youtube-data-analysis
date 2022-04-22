@@ -1,0 +1,16 @@
+Hi, My name is Hantang Li. Here I will present to you my Youtube Data visualization website. 
+This website consists of one page, with an introduction and five interactive plots. Those plots will help you compare 2017 and 2022 Canadain daily youtube trending videos, and understand what kind of video could have a higher view. The data that I used are directly downloaded from Kaggle and I pre processed it you can see how I did that in my report. My report also explains how I did my analyzation in detail, so please be sure to check it.
+
+
+The first plot is a boxplot shows the distribution of log scaled views per trending video; you can intuitively understand that videos are getting more views in two thousand 22 compared to two thousand 17. So YouTube is getting popular, and lets know more about it.
+
+The second plot shows average normalized views and their corresponding category for each year. Each colour represents a different category. The size of each ball shows what percentage of each category's video accounted for the total number of videos in a year. the larger the ball, the  more videos belong to that category that year. You can see that there are more gaming videos in 2022, where about 23 percent of all the trending videos are gaming videos, but each video shares fewer views. While for entertainment videos, although fewer videos belong to the Entertainment category, each video gets more viewed. Those two are popular categories. If you evaluate popularity only by views, the nonprofit video is the most popular one. As it gets the most view.
+
+
+The third plot, This plot shows the relation between video duration and the average normalized views for each category. You can see the decreasing trend. While video duration increases, view decreases. However, 2017 movies and nonprofits are exceptions, although there are only 6 and 52.
+
+For the fourth plot, I used the text mining technique for the fourth plot and removed stop words. the plot Shows the most popular 20 words that appeared in the video title for both datasets. We can see that episodes were popular in video titles back in 2017, hinting that most trending videos are shows. Nowadays, words related to games occur most often, such as official, video, and Minecraft.
+
+For the last boxplot, out of curiosity, does the video uploading time related to the views? Surprisingly, from the plot, we can see that videos uploaded at 4, 5, and 9 am tends to have higher views. 
+
+So this is the website. I hope you like it and have a great day.
