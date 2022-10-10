@@ -1,4 +1,4 @@
-# JSC370_Project_Youtube_data_analysis
+# Youtube_data_analysis
 
 author: Hantang Li
 
