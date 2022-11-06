@@ -8,9 +8,9 @@ We will use past Canadian area's youtube daily trending video datasets found onl
 
 For comparison, we found another Canadian area's youtube daily trending video dataset from Kaggle with a similar data format which was collected using YouTube Data API v3. The data ranges from 2020-08-12 to 2022-03-07. The download link is https://www.kaggle.com/rsrishav/youtube-trending-video-dataset. 
 
-**Link to this repository:** https://github.com/Hantang-Li/JSC370-Final
+**Link to this repository:** https://github.com/Hantang-Li/Youtube-data-analysis
 
-**Link to the website:** https://hantang-li.github.io/JSC370-Final/
+**Link to the website:** https://hantang-li.github.io/Youtube-data-analysis/
 
 # Project components
 
