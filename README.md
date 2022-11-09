@@ -12,6 +12,8 @@ For comparison, we found another Canadian area's youtube daily trending video da
 
 **Link to the website:** https://hantang-li.github.io/Youtube-data-analysis/
 
+**Link to the report:** https://github.com/Hantang-Li/Youtube-data-analysis/blob/main/final_report.pdf
+
 # Project components
 
 This project includes two reproducible reports and one script for data preprocessing. 
